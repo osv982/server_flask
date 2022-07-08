@@ -1,0 +1,74 @@
+БД MSSQL server
+логин user_1
+пароль user 
+
+путь к базе 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mssql+pyodbc://user_1:user@127.0.0.1:1433/py_history?driver=SQL+Server'
+
+
+telnet 127.0.0.1 5000
+ctrl + ]
+set localecho
+enter
+
+
+добавить 
+post /add_query HTTP/1.1
+Content-type:application/json
+Content-length:30
+# здесь пустая строка
+{"query":"query_2","user":123}   
+
+
+
+удалить
+delete /delete_history HTTP/1.1
+Content-type:application/json
+Content-length:12
+
+{"user":123}
+
+
+
+прочитать 
+get /get_history HTTP/1.1
+Content-type:application/json
+Content-length:12
+
+{"user":123}
+
+
+
+прочитать n последних 
+get /get_last_queries HTTP/1.1
+Content-type:application/json
+Content-length:18
+
+{"user":123,"n":2}
+
+
+
+USE [flask_server_db]
+GO
+
+/****** Object:  Table [dbo].[users_history]    Script Date: 07.07.2022 16:20:46 ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[users_history](
+	[history_id] [int] IDENTITY(1,1) NOT NULL,
+	[history_user] [int] NOT NULL,
+	[history_query] [nvarchar](max) NOT NULL,
+	[history_date] [datetime] NOT NULL,
+ CONSTRAINT [PK_Table_1] PRIMARY KEY CLUSTERED 
+(
+	[history_id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+
+ 
