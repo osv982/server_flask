@@ -2,9 +2,10 @@ from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 
 from datetime import datetime
-import threading
+from threading import Timer
 
 import Models
+from config import TIME_OUT,QUERY_LIMIT
 
 # object for the Flask
 app = Flask(__name__)
@@ -17,14 +18,18 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mssql+pyodbc://user_1:user@127.0.0.1:14
 db = SQLAlchemy(app)
 
 
-@app.route('/add_query', methods=['POST'])
-def add_query():
+@app.route('/add_query/<user>', methods=['POST'])
+def add_query(user):
     # добавляет запрос в историю
+    # post /add_query/123 HTTP/1.1
+    # Content - type: text/plain
+    # Content - length:7
+    # здесь пустая строка
+    # query 0
+
     try:
-        data = request.get_json()
-        query = data["query"]
-        user = data["user"]
-        new_query = Models.history_users(user, query, datetime.utcnow())
+        data_query = request.get_data().decode('utf-8')
+        new_query = Models.users_history(user, data_query, datetime.utcnow())
         db.session.add(new_query)
         db.session.commit()
     except TypeError:
@@ -32,14 +37,12 @@ def add_query():
     return "adding the query successfully"
 
 
-@app.route('/delete_history', methods=['DELETE'])
-def delete_history():
+@app.route('/delete_history/<user>', methods=['DELETE'])
+def delete_history(user):
     # очищает историю запросов пользователя
     try:
-        data = request.get_json()
-        user = data["user"]
-        del_query = db.session.query(Models.history_users).filter(
-            Models.history_users.history_user == user).all()
+        del_query = db.session.query(Models.users_history).filter(
+            Models.users_history.history_user == user).all()
         for i in del_query:
             db.session.delete(i)
         db.session.commit()
@@ -48,48 +51,38 @@ def delete_history():
     return "deleting the history successfully"
 
 
-@app.route('/get_history', methods=['GET'])
-def get_history():
+@app.route('/get_history/<user>', methods=['GET'])
+def get_history(user):
     # возвращает историю запросов пользователя
-    data = request.get_json()
-    user = data["user"]
-    query = db.session.query(Models.history_users).filter(Models.history_users.history_user == user).all()
-    return jsonify([item.get_date_query for item in query])
+    get_query = db.session.query(Models.users_history).filter(Models.users_history.history_user == user).all()
+    return jsonify([item.get_date_query for item in get_query])
 
 
-@app.route('/get_last_queries', methods=['GET'])
-def get_last_queries():
+@app.route('/get_last_queries/<user>/<query_count>', methods=['GET'])
+def get_last_queries(user, query_count):
     # возвращает последние N запросов пользователя
-    data = request.get_json()
-    user = data["user"]
-    query_count = data["n"]
-    query = db.session.query(Models.history_users).filter(
-        Models.history_users.history_user == user).order_by(
-        Models.history_users.history_in.desc()).limit(query_count).all()
-    return jsonify([item.get_date_query for item in query])
+    get_query = db.session.query(Models.users_history).filter(
+        Models.users_history.history_user == user).order_by(
+        Models.users_history.history_id.desc()).limit(query_count).all()
+    return jsonify([item.get_date_query for item in get_query])
 
 
 def delete_query_every_hour():
     # очищает историю запросов каждый час, если число запросов превысило предел
-    one_hour = 60 * 60
-    threading.Timer(one_hour, delete_query_every_hour).start()  # Перезапуск функции каждый час
+    # threading.Timer(TIME_OUT, delete_query_every_hour).start()  # Перезапуск функции каждый час
+    for user in db.session.query(Models.users_history).all():  # итерируемся по каждому пользователю
+        query_count = db.session.query(Models.users_history).filter(
+            Models.users_history.history_user == user.history_user).count()
 
-    query_limit = 100  # размер буффера запросов
+        if query_count > QUERY_LIMIT:  # если количество запросов пользователя превышает предел
+            reverse_history = db.session.query(Models.users_history).filter(
+                Models.users_history.history_user == user.history_user).order_by(
+                Models.users_history.history_id.desc()).all()  # выбираем все запросы в обратном порядке
 
-    for user in db.session.query(Models.history_users).all():  # итерируемся по каждому пользователю
-        query_count = db.session.query(Models.history_users).filter(
-            Models.history_users.history_user == user.history_user).count()
-
-        if query_count > query_limit:  # если количество запросов пользователя превышает предел
-            reverse_history = db.session.query(Models.history_users).filter(
-                Models.history_users.history_user == user.history_user).order_by(
-                Models.history_users.history_in.desc()).all()  # выбираем все запросы в обратном порядке
-
-            for item in range(query_limit, query_count):
+            for item in range(QUERY_LIMIT, query_count):
                 db.session.delete(reverse_history[item])
             db.session.commit()
 
-
 if __name__ == '__main__':
-    delete_query_every_hour()
-    app.run(debug=True)
+    Timer(TIME_OUT, delete_query_every_hour).start()
+    app.run(host="0.0.0.0", port=5000, debug=True)
