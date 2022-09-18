@@ -55,7 +55,7 @@ def delete_history(user):
 def get_history(user):
     # возвращает историю запросов пользователя
     get_query = db.session.query(Models.users_history).filter(Models.users_history.history_user == user).all()
-    return jsonify([item.get_date_query for item in get_query])
+    return jsonify([item.get_date_query() for item in get_query])
 
 
 @app.route('/get_last_queries/<user>/<query_count>', methods=['GET'])
@@ -64,7 +64,7 @@ def get_last_queries(user, query_count):
     get_query = db.session.query(Models.users_history).filter(
         Models.users_history.history_user == user).order_by(
         Models.users_history.history_id.desc()).limit(query_count).all()
-    return jsonify([item.get_date_query for item in get_query])
+    return jsonify([item.get_date_query() for item in get_query])
 
 
 def delete_query_every_hour():
