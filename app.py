@@ -28,7 +28,7 @@ def add_query(user):
     # query 0
 
     try:
-        data_query = request.get_data().decode('utf-8')
+        data_query = json.loads(request.get_data().decode('utf-8'))
         new_query = Models.users_history(user, data_query, datetime.utcnow())
         db.session.add(new_query)
         db.session.commit()
